@@ -11,7 +11,7 @@ elastic_server = None
 def load():
     global elastic_server
     global fh
-    elastic_server = 'YOUR_ELASTIC_SEARCH_ADDRESS'
+    elastic_server = '54.174.215.250:5601'
     fh = logging.FileHandler('elasticsearch.log')
     fh.setLevel(logging.DEBUG)
     logger.addHandler(fh)
@@ -27,6 +27,7 @@ def unload():
 def instance_modified(resource, old_resource=None, user_resource_id=None):
     global elastic_server
     global logger
+    logger.info("Using [%s]" % (elastic_server))
     try:
         logger.info("Insatnces [%s] was modified" % (resource.resource_id))
         es = Elasticsearch(elastic_server)
