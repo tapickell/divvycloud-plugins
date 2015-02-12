@@ -1,11 +1,7 @@
 from DivvyPlugins.hookpoints import hookpoint
 import logging
 import simplejson as json
-from datetime import datetime
-import DivvyDb
-from DivvyDb import DivvyInterfaceORM
-from DivvyDb import DivvyDbObjects
-
+from DivvyResource.ResourceOperations import ResourceOperations_ResourceGroup
 
 
 logger = logging.getLogger("Ansible")
@@ -13,41 +9,41 @@ fh = None
 
 def load():
     global fh
+    fh = logging.FileHandler('logs/ansible.log')
+    fh.setLevel(logging.DEBUG)
+    logger.addHandler(fh)
+    logger.info("Loaded")
 
 def unload():
     global fh
     logger.removeHandler(fh)
 
-@DivvyDb.SharedSessionScope(DivvyInterfaceORM.DivvyInterfaceORM)
-@hookpoint('divvycloud.instance.create')
-def handle_new_instance(resource,user_resource_id=None):
 
-    if (resource.tags.tags == None):
-        logger.error("Resource has no tags [ %s ] " % resource.instance.name)
+@hookpoint('divvycloud.instance.modified')
+def handle_modified_instance(resource, old_resource=None, user_resource_id=None):
 
-    tags = json.loads(resource.tags.tags)
+    try:
+        logger.info("Detected instance modified")
+        if (resource.instance.tags.tags == None):
+            logger.error("Resource has no tags [ %s ] " % resource.instance.name)
+            return 
 
-    if tags.has_key("environment"):
-        env = tags.get("environment","No Environment")
-        db = DivvyInterfaceORM.DivvyInterfaceORM()
-        resource_groups = db.session.query(DivvyDbObjects.ResourceGroup).\
-                    filter(DivvyDbObjects.ResourceGroup == env).\
-                    all()
+        tags = json.loads(resource.instance.tags.tags)
 
+        if tags.has_key("environment"):
+            env_name= tags.get("environment","No Environment")
+            resource_group = ResourceOperations_ResourceGroup.get_by_name(organization_id = 2 , resource_group_name = env_name)
+            if(resource_group == None):
+                logger.error("Unable to find resource group for environment [%s] " % (env_name))
 
-        resource_group = resource_groups[0]
-        resource_group_id = resource_group["resource_group_id"]
+            if(resource_group.contains_resource(resource.resource_id)):
+                logger.error("Unable to add resource, resource already exists")
 
-        resource_id = resource.resource_id
-        db.AssociateResourceToResourceGroup(2, resource_group_id=resource_group_id, resource_id=resource_id)
+            resource_group.add_resource_to_group(resource.resource_id)
+    except Exception,e:
+        logger.exception(e)
 
-@hookpoint('divvy.resource_group.modified'):
-def handle_resource_group_modification(resource,old_resource,user_resource_id=None):
-    logger.info("Resource group has been modified")
-
-
-
-
+    return
 
 
 
